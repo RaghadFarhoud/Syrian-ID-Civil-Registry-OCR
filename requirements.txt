@@ -1,0 +1,7 @@
+pytesseract==0.3.13
+opencv-python-headless>=4.10
+numpy>=1.26
+pillow>=10.0
+rapidfuzz>=3.14
+python-bidi>=0.6
+arabic-reshaper>=3.0
