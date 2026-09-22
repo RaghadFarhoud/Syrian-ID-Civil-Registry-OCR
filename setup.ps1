@@ -1,18 +1,14 @@
-# سكربت إعداد المشروع على لابتوب Windows: يعمل venv، يثبت المتطلبات، وينزّل موديلات paddle
-# تشغيل: افتح PowerShell بمجلد المشروع واكتب: .\setup.ps1
-# إذا طلع خطأ "running scripts is disabled" اول مرة، شغّل هالأمر مرة وحدة:
-#   Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "== 1. التحقق من Python ==" -ForegroundColor Cyan
+Write-Host "1. Python checking" -ForegroundColor Cyan
 $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
 if (-not $pythonCmd) {
-    Write-Host "python غير موجود. نزّله من https://python.org وتأكد تأشر (Add python.exe to PATH) أثناء التثبيت." -ForegroundColor Red
+    Write-Host "python does not exist, download it from https://python.org and make sure to point (Add python.exe to PATH) during installation" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "== 2. إنشاء بيئة افتراضية (venv) ==" -ForegroundColor Cyan
+Write-Host "2. creating virtual environment (venv)" -ForegroundColor Cyan
 if (-not (Test-Path "venv")) {
     python -m venv venv
 }
@@ -20,27 +16,27 @@ if (-not (Test-Path "venv")) {
 $venvPython = ".\venv\Scripts\python.exe"
 $venvPip = ".\venv\Scripts\pip.exe"
 
-Write-Host "== 3. تحديث pip ==" -ForegroundColor Cyan
+Write-Host "3. updating pip" -ForegroundColor Cyan
 & $venvPip install --upgrade pip
 
-Write-Host "== 4. تثبيت متطلبات المشروع (Tesseract wrapper + PaddleOCR) ==" -ForegroundColor Cyan
+Write-Host "4. installing project dependencies (Tesseract wrapper + PaddleOCR)" -ForegroundColor Cyan
 & $venvPip install -r requirements.txt
 
-Write-Host "== 5. تنزيل موديلات PaddleOCR (لمرة وحدة فقط لكل جهاز) ==" -ForegroundColor Cyan
+Write-Host "5. downloading PaddleOCR models (for each device only once)" -ForegroundColor Cyan
 if (-not (Test-Path "models")) {
     & $venvPython core\download_paddle_models.py
 } else {
-    Write-Host "مجلد models موجود مسبقاً - تم التخطي."
+    Write-Host "models folder already exists - skipping."
 }
 
-Write-Host "== 6. التحقق من Tesseract ==" -ForegroundColor Cyan
+Write-Host "6. checking Tesseract" -ForegroundColor Cyan
 $tesseractPath = "C:\Program Files\Tesseract-OCR\tesseract.exe"
 if (-not (Test-Path $tesseractPath)) {
-    Write-Host "تحذير: Tesseract غير مثبت بالمسار الافتراضي ($tesseractPath)." -ForegroundColor Yellow
-    Write-Host "نزّله من: https://github.com/UB-Mannheim/tesseract/wiki (تأكد تختار Arabic بوقت التثبيت)"
+    Write-Host "Warning: Tesseract is not installed in the default path ($tesseractPath)." -ForegroundColor Yellow
+    Write-Host "Download it from: https://github.com/UB-Mannheim/tesseract/wiki (Make sure to select Arabic during installation)"
 }
 
 Write-Host ""
-Write-Host "الإعداد اكتمل. لتشغيل الـ API:" -ForegroundColor Green
+Write-Host "7. to run API:" -ForegroundColor Green
 Write-Host "  .\venv\Scripts\Activate.ps1"
 Write-Host "  uvicorn api:app --host 0.0.0.0 --port 8000"
