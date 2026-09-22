@@ -16,7 +16,7 @@ $venvPython = ".\venv\Scripts\python.exe"
 $venvPip = ".\venv\Scripts\pip.exe"
 
 Write-Host "3. updating pip" -ForegroundColor Cyan
-& $venvPip install --upgrade pip
+& $venvPython -m pip install --upgrade pip
 
 Write-Host "4. installing project dependencies (Tesseract wrapper + PaddleOCR)" -ForegroundColor Cyan
 & $venvPip install -r requirements.txt
