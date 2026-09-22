@@ -1,5 +1,7 @@
 venv/
-.venv/
+models/
 __pycache__/
 *.pyc
-.env
+result.json
+*.jpg
+!sample_images/*.jpg
