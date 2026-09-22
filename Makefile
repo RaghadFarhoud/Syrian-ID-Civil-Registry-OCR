@@ -9,7 +9,7 @@ setup:
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
 	@if [ ! -d models ]; then $(PY) core/download_paddle_models.py; fi
-	@echo "الإعداد اكتمل. شغّل: make run"
+	@echo "run: make run"
 
 run:
 	$(VENV)/bin/uvicorn api:app --host 0.0.0.0 --port 8000 --reload

@@ -1,4 +1,3 @@
-# حل بديل أقوى من venv+bash لنشر المشروع على أي جهاز بدون قلق من إصدارات النظام
 FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

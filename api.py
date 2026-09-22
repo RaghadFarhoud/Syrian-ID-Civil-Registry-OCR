@@ -1,6 +1,5 @@
 """
-REST API لخدمة استخراج بيانات الهوية والسجل المدني.
-تشغيل محلي: uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+locally running: uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 """
 import shutil
 import tempfile
@@ -18,7 +17,6 @@ app = FastAPI(
     description="واجهة REST لاستخراج بيانات الهوية والسجل المدني من الصور",
 )
 
-# يسمح لموقعك (دومين مختلف) يتصل بالـ API. بالإنتاج بدّل "*" بدومين الموقع الفعلي.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,13 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_PADDLE_ENGINE = None  # نحمّل موديل paddle مرة وحدة بس، عند أول طلب يطلبه
+_PADDLE_ENGINE = None  
 
 
 def _get_engine(engine_name: str):
     global _PADDLE_ENGINE
     if engine_name == "tesseract":
-        return None  # None => الـ pipeline بترجع لـ TesseractOCREngine الافتراضي
+        return None  
     if _PADDLE_ENGINE is None:
         from main import build_paddle_engine
         _PADDLE_ENGINE = build_paddle_engine()
@@ -41,8 +39,6 @@ def _get_engine(engine_name: str):
 
 @app.on_event("startup")
 def _preload_default_engine():
-    # نحمّل موديل paddle مرة وحدة عند إقلاع السيرفر، مش عند أول طلب،
-    # لأنو التحميل بياخد وقت وما لازم أول مستخدم يستناه.
     _get_engine("paddle")
 
 
@@ -55,7 +51,7 @@ def health():
 async def extract(
     document_type: str = Form(..., description="national_id أو civil_registry"),
     engine: str = Form("paddle", description="paddle أو tesseract"),
-    files: list[UploadFile] = File(..., description="صورة واحدة للسجل المدني، صورتين (أمامية+خلفية) للهوية"),
+    files: list[UploadFile] = File(..., description="صورة واحدة للسجل المدني، صورتين (أمامية + خلفية) للهوية"),
 ):
     if document_type not in ("national_id", "civil_registry"):
         raise HTTPException(400, "document_type يجب أن يكون national_id أو civil_registry")
