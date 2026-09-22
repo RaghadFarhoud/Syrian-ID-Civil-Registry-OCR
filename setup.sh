@@ -1,4 +1,3 @@
-
 set -e
 
 PYTHON_BIN="${PYTHON_BIN:-python3}"
@@ -22,7 +21,7 @@ pip install -r requirements.txt
 
 echo "5. downloading paddleocr models (1.5 GB)"
 if [ ! -d "models" ]; then
-    python core/download_paddle_models.py
+    python scripts/download_paddle_models.py
 else
     echo "already downloaded, skipping.."
 fi

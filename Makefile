@@ -8,7 +8,7 @@ setup:
 	python3 -m venv $(VENV)
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
-	@if [ ! -d models ]; then $(PY) core/download_paddle_models.py; fi
+	@if [ ! -d models ]; then $(PY) scripts/download_paddle_models.py; fi
 	@echo "run: make run"
 
 run:

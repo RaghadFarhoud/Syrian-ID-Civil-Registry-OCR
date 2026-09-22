@@ -1,4 +1,3 @@
-
 $ErrorActionPreference = "Stop"
 
 Write-Host "1. Python checking" -ForegroundColor Cyan
@@ -24,7 +23,7 @@ Write-Host "4. installing project dependencies (Tesseract wrapper + PaddleOCR)" 
 
 Write-Host "5. downloading PaddleOCR models (for each device only once)" -ForegroundColor Cyan
 if (-not (Test-Path "models")) {
-    & $venvPython core\download_paddle_models.py
+    & $venvPython scripts\download_paddle_models.py
 } else {
     Write-Host "models folder already exists - skipping."
 }
