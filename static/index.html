@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>استخراج بيانات الهوية والسجل المدني</title>
+<link rel="icon" href="/logo">
+<style>
+  /* ===== Palette sampled directly from logo.jpg =====
+     dominant: #032524 (teal-950)  •  accent: #988461 (gold-500) */
+  :root {
+    --teal-950: #032524;
+    --teal-900: #062d2c;
+    --teal-800: #0b413f;
+    --teal-700: #135856;
+    --teal-600: #1e716e;
+    --teal-500: #298e8b;
+    --teal-400: #37aeaa;
+    --teal-300: #68cac7;
+    --teal-200: #afdedd;
+    --teal-100: #e4f1f0;
+    --gold-700: #635336;
+    --gold-600: #7d6a4a;
+    --gold-500: #988461;
+    --gold-400: #b1a081;
+    --gold-300: #ccbda4;
+    --gold-200: #e4dac8;
+    --gold-100: #f4efe6;
+
+    --bg: var(--teal-950);
+    --surface: var(--teal-900);
+    --surface-2: var(--teal-800);
+    --line: #124b48;
+    --text: var(--teal-100);
+    --text-strong: #ffffff;
+    --muted: #8fb3b1;
+    --accent: var(--gold-400);
+    --accent-strong: var(--gold-500);
+    --on-accent: var(--teal-950);
+    --ok: var(--teal-300);
+    --warn: var(--gold-300);
+    --err: #f0a3a3;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    background:
+      radial-gradient(1100px 520px at 50% -180px, #0a3a38 0%, transparent 70%),
+      var(--bg);
+    background-attachment: fixed;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+  }
+  .wrap { width: 100%; max-width: 720px; }
+  header { text-align: center; margin-bottom: 24px; }
+  .brand { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 12px; }
+  .brand img {
+    width: 64px; height: 64px; border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--gold-600);
+    object-fit: cover;
+  }
+  .brand-text { text-align: right; }
+  header h1 { font-size: 26px; color: var(--gold-300); margin-bottom: 6px; letter-spacing: .2px; }
+  header p { color: var(--muted); font-size: 15px; }
+  .rule {
+    height: 1px; border: 0; margin: 18px 0 0;
+    background: linear-gradient(to left, transparent, var(--gold-600), transparent);
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    margin-bottom: 18px;
+  }
+  .field { margin-bottom: 18px; }
+  .field:last-child { margin-bottom: 0; }
+  label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 15px; color: var(--text-strong); }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  select, input[type="file"] {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: inherit;
+    background: var(--surface-2);
+    color: var(--text);
+    cursor: pointer;
+  }
+  select option { background: var(--teal-900); color: var(--teal-100); }
+  input[type="file"]::file-selector-button {
+    background: var(--teal-700); color: var(--teal-100);
+    border: 1px solid var(--teal-600); border-radius: 8px;
+    padding: 7px 12px; margin-left: 10px; font-family: inherit;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  input[type="file"]::file-selector-button:hover { background: var(--teal-600); }
+  select:focus, input[type="file"]:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  button {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: var(--on-accent);
+    border: none;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .2s, transform .1s;
+    margin-top: 6px;
+  }
+  button:hover { background: var(--gold-300); }
+  button:active { transform: translateY(1px); }
+  button:disabled { background: #4b6b69; color: #9cb8b6; cursor: not-allowed; transform: none; }
+  .spinner {
+    display: none;
+    width: 42px;
+    height: 42px;
+    border: 4px solid var(--teal-800);
+    border-top-color: var(--gold-400);
+    border-radius: 50%;
+    margin: 18px auto 10px;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text {
+    display: none;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .alert { display: none; padding: 13px 15px; border-radius: 10px; font-size: 14px; margin-top: 16px; line-height: 1.7; }
+  .alert.ok { background: rgba(41, 142, 139, .16); color: var(--teal-200); border: 1px solid var(--teal-600); }
+  .alert.warn { background: rgba(152, 132, 97, .18); color: var(--gold-200); border: 1px solid var(--gold-600); }
+  .alert.err { background: rgba(190, 60, 60, .16); color: #f7c9c9; border: 1px solid #8a3a3a; }
+  .results-title { font-size: 16px; font-weight: 700; margin: 20px 0 10px; color: var(--gold-300); }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+  th, td { padding: 11px 14px; text-align: right; border-bottom: 1px solid var(--line); font-size: 14px; }
+  th { background: var(--surface-2); color: var(--gold-300); font-weight: 600; width: 45%; }
+  td { color: var(--text); word-break: break-word; }
+  td input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--teal-950);
+  }
+  td input::placeholder { color: #6d908e; }
+  td input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  tr:last-child td, tr:last-child th { border-bottom: none; }
+  .files-badge {
+    display: none;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--teal-200);
+  }
+  .transfer-card { display: none; }
+  .transfer-card.two > button { flex: 1 1 100%; }
+  .transfer-card .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .transfer-card button.transfer {
+    flex: 1 1 100%;
+    background: var(--teal-400);
+    color: var(--on-accent);
+    font-size: 16px;
+  }
+  .transfer-card button.transfer:hover { background: var(--teal-300); }
+  .transfer-card button.copy {
+    flex: 1 1 100%;
+    background: transparent;
+    color: var(--gold-300);
+    font-size: 15px;
+    border: 1px solid var(--gold-600);
+  }
+  .transfer-card button.copy:hover { background: rgba(152, 132, 97, .16); }
+  #transferToast {
+    display: none;
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  #transferToast.ok { background: rgba(41, 142, 139, .16); color: var(--teal-200); border: 1px solid var(--teal-600); }
+  #transferToast.warn { background: rgba(152, 132, 97, .18); color: var(--gold-200); border: 1px solid var(--gold-600); }
+  #transferToast.err { background: rgba(190, 60, 60, .16); color: #f7c9c9; border: 1px solid #8a3a3a; }
+  /* ===== الكاميرا: التقاط مباشر ===== */
+  .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tabs .tab {
+    flex: 1 1 0; width: auto; margin: 0; padding: 11px 12px;
+    font-size: 15px; font-weight: 700;
+    background: var(--surface-2); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 10px;
+  }
+  .tabs .tab:hover { background: var(--teal-700); color: var(--text); }
+  .tabs .tab.active {
+    background: var(--accent); color: var(--on-accent); border-color: var(--accent);
+  }
+  .cam-stage {
+    position: relative; background: #000;
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    aspect-ratio: 4 / 3;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cam-stage video { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .cam-idle {
+    position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    color: var(--muted); font-size: 14px; text-align: center; padding: 18px;
+    line-height: 1.8;
+  }
+  .cam-controls { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .cam-controls button {
+    width: auto; flex: 1 1 150px; margin: 0; padding: 11px 12px;
+    font-size: 15px; font-weight: 700;
+  }
+  .cam-controls button.shot { background: var(--teal-400); color: var(--on-accent); }
+  .cam-controls button.shot:hover:not(:disabled) { background: var(--teal-300); }
+  .cam-controls button.ghost {
+    background: transparent; color: var(--gold-300);
+    border: 1px solid var(--gold-600); font-weight: 600;
+  }
+  .cam-controls button.ghost:hover { background: rgba(152, 132, 97, .16); }
+  .cam-devices { flex: 1 1 100%; margin: 0; }
+  .shots { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .shot-item {
+    position: relative; width: 122px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--teal-600); background: var(--surface-2);
+  }
+  .shot-item img { display: block; width: 100%; height: 86px; object-fit: cover; }
+  .shot-item .cap {
+    font-size: 12px; padding: 5px 7px; color: var(--teal-200);
+    text-align: center;
+  }
+  .shot-item .del {
+    position: absolute; top: 4px; left: 4px;
+    width: 24px; height: 24px; padding: 0; margin: 0; border-radius: 50%;
+    background: rgba(0, 0, 0, .62); color: #fff;
+    font-size: 16px; line-height: 1; font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, .35);
+  }
+  .shot-item .del:hover { background: #b5443f; }
+  .shot-empty {
+    flex: 1 1 100%; border: 1px dashed var(--line); border-radius: 10px;
+    padding: 12px; color: var(--muted); font-size: 13px; text-align: center;
+  }
+  /* ===== status of each field ===== */
+  .fstatus {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 23px; height: 23px; border-radius: 50%;
+    font-size: 13px; font-weight: 700; margin-left: 9px;
+    border: 1px solid transparent; vertical-align: middle;
+  }
+  .fstatus.ok { background: rgba(41, 142, 139, .2); color: var(--teal-300); border-color: var(--teal-600); }
+  .fstatus.low { background: rgba(152, 132, 97, .22); color: var(--gold-200); border-color: var(--gold-600); }
+  .fstatus.missing { background: rgba(190, 60, 60, .2); color: #f7c9c9; border-color: #8a3a3a; }
+  td input.low { border-color: var(--gold-600); background: rgba(152, 132, 97, .1); }
+  td input.missing { border-color: #8a3a3a; background: rgba(190, 60, 60, .08); }
+  .status-summary {
+    display: none; align-items: center; gap: 16px; flex-wrap: wrap;
+    margin: 0 0 12px; padding: 11px 14px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+    font-size: 13px; color: var(--muted);
+  }
+  .status-summary span { display: inline-flex; align-items: center; gap: 7px; }
+  .status-summary .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .status-summary .dot.ok { background: var(--teal-300); }
+  .status-summary .dot.low { background: var(--gold-400); }
+  .status-summary .dot.missing { background: #d97070; }
+  .status-legend { font-size: 12px; color: var(--muted); margin-top: -4px; margin-bottom: 12px; }
+  footer {
+    margin-top: 24px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <img src="/logo" alt="شعار استخراج بيانات الهوية والسجل المدني">
+      <div class="brand-text">
+        <h1>استخراج بيانات الهوية والسجل المدني</h1>
+        <p>ارفع صورة المستند أو التقطها بالكاميرا， وسيتم استخراج البيانات تلقائياً</p>
+      </div>
+    </div>
+    <hr class="rule">
+  </header>
+
+  <div class="card">
+    <div class="field">
+      <label for="docType">نوع المستند</label>
+      <select id="docType">
+        <option value="national_id">بطاقة الهوية (صورتان: الأمامية والخلفية)</option>
+        <option value="civil_registry">السجل المدني (صورة واحدة)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="files">صور المستند</label>
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab active" data-mode="upload">رفع صورة من الجهاز</button>
+        <button type="button" class="tab" data-mode="camera">التقاط صورة بالكاميرا</button>
+      </div>
+
+      <div id="uploadPane">
+        <input type="file" id="files" accept="image/*" multiple>
+      </div>
+
+      <div id="cameraPane" hidden>
+        <div class="cam-stage">
+          <video id="camVideo" playsinline autoplay muted></video>
+          <div class="cam-idle" id="camIdle">
+            <div id="camIdleMsg">الكاميرا مغلقة — اضغط «تشغيل الكاميرا» للبدء.</div>
+          </div>
+        </div>
+        <div class="cam-controls">
+          <button type="button" id="camStart">تشغيل الكاميرا</button>
+          <button type="button" class="shot" id="camShot" disabled>التقاط الصورة</button>
+          <button type="button" class="ghost" id="camStop" disabled>إيقاف الكاميرا</button>
+          <select id="camDevices" class="cam-devices" hidden></select>
+        </div>
+        <div class="hint" id="camStatus">لم تبدأ الكاميرا بعد.</div>
+        <div class="shots" id="shots"></div>
+      </div>
+      <div class="hint" id="filesHint">اختر صورتين: الأمامية والخلفية للهوية.</div>
+      <div class="files-badge" id="filesBadge"></div>
+    </div>
+
+    <div class="field">
+      <label for="engine">محرك القراءة</label>
+      <select id="engine">
+        <option value="paddle">نظام Paddle (موصى به)</option>
+        <option value="tesseract">نظام Tesseract</option>
+      </select>
+    </div>
+
+    <button id="runBtn">استخراج البيانات</button>
+
+    <div class="spinner" id="spinner"></div>
+    <div class="loading-text" id="loadingText">جاري المعالجة... في أول مرة قد يستغرق تحميل الموديلات من 30 إلى 60 ثانية.</div>
+  </div>
+
+  <div class="alert" id="alert"></div>
+
+  <div class="results-title" id="resultsTitle" style="display:none;"></div>
+  <div class="status-summary" id="statusSummary"></div>
+  <div class="status-legend" id="statusLegend" style="display:none;">✓ مستخرج بشکل · ⚠ غير مؤكد انتبه مراجعة · ✗ مفقود — أدخله يدوياً من الجدول</div>
+  <div id="resultsTable" style="display:none;"></div>
+
+  <div class="card transfer-card" id="transferCard">
+    <div class="results-title" style="margin-top:0;">نقل البيانات إلى موقع الإدخال</div>
+    <p class="hint" style="margin-bottom:12px;">راجع القيم في الجدول أعلاه وعدّلها إن لزم (لتصحيح أي خطأ من الذكاء الاصطناعي) ثم اضغط الزر لنقل البيانات إلى نموذج الموقع الحقيقي في التاب الآخر (يتطلب تركيب إضافة ID Relay في المتصفح).</p>
+    <div class="actions">
+      <button class="transfer" id="transferBtn">نقل البيانات إلى صفحة الإدخال ⇦</button>
+      <button class="copy" id="copyBtn">نسخ البيانات (بديل)</button>
+    </div>
+    <div id="transferToast"></div>
+  </div>
+
+  <footer>يعمل الخادم محلياً على جهازك فقط — لا يتم إرسال أي صورة إلى الإنترنت.</footer>
+</div>
+
+<script>
+  const docType = document.getElementById('docType');
+  const filesInput = document.getElementById('files');
+  const filesHint = document.getElementById('filesHint');
+  const filesBadge = document.getElementById('filesBadge');
+  const engine = document.getElementById('engine');
+  const runBtn = document.getElementById('runBtn');
+  const spinner = document.getElementById('spinner');
+  const loadingText = document.getElementById('loadingText');
+  const alertBox = document.getElementById('alert');
+  const resultsTitle = document.getElementById('resultsTitle');
+  const statusSummary = document.getElementById('statusSummary');
+  const statusLegend = document.getElementById('statusLegend');
+  const resultsTable = document.getElementById('resultsTable');
+  const transferCard = document.getElementById('transferCard');
+  const transferBtn = document.getElementById('transferBtn');
+  const copyBtn = document.getElementById('copyBtn');
+  const transferToast = document.getElementById('transferToast');
+
+  let lastResult = null;
+
+  const FIELD_LABELS = {
+    first_name: 'الاسم الأول',
+    father_name: 'اسم الأب',
+    family_name: 'النسبة (الشهرة)',
+    mother_name: 'اسم الأم',
+    mother_family_name: 'نسبة الأم',
+    birth_date: 'تاريخ الولادة',
+    amanah: 'الأمانة',
+    registry_number: 'رقم القيد',
+    national_number: 'الرقم الوطني'
+  };
+
+  const DOC_LABELS = {
+    national_id: 'بطاقة الهوية',
+    civil_registry: 'السجل المدني'
+  };
+
+  // أسماء عرض لمفاتيح النقل (بما فيها حقول التجهيز الثابتة)
+  const RELAY_LABELS = {
+    ...FIELD_LABELS,
+    card_name: 'نوع البطاقة (هوية)',
+    card_issuer: 'جهة الإصدار (نفوس)'
+  };
+  const relayName = k => RELAY_LABELS[k] || k;
+
+  docType.addEventListener('change', () => {
+    filesInput.value = '';
+    cam.shots = [];
+    renderShots();
+    filesHint.textContent = hintFor();
+    if (cam.mode === 'camera' && cam.stream) setCamStatus(camReadyMsg(), 'ok');
+    updateBadge();
+  });
+
+  filesInput.addEventListener('change', updateBadge);
+
+  /* ================= الكاميرا: التقاط مباشر ================= */
+  const camVideo = document.getElementById('camVideo');
+  const camIdle = document.getElementById('camIdle');
+  const camIdleMsg = document.getElementById('camIdleMsg');
+  const camStart = document.getElementById('camStart');
+  const camShot = document.getElementById('camShot');
+  const camStop = document.getElementById('camStop');
+  const camDevices = document.getElementById('camDevices');
+  const camStatus = document.getElementById('camStatus');
+  const shotsBox = document.getElementById('shots');
+  const uploadPane = document.getElementById('uploadPane');
+  const cameraPane = document.getElementById('cameraPane');
+  const modeTabs = Array.prototype.slice.call(document.querySelectorAll('.tabs .tab'));
+
+  const cam = { mode: 'upload', shots: [], stream: null, deviceId: '' };
+
+  const expectedCount = () => (docType.value === 'national_id' ? 2 : 1);
+  const shotName = i => (docType.value === 'national_id' ? (i === 0 ? 'الأمامية' : 'الخلفية') : 'المستند');
+
+  // الصور الجاهزة للإرسال حسب الوضع المختار
+  function pendingFiles() {
+    return cam.mode === 'camera' ? cam.shots.slice() : Array.prototype.slice.call(filesInput.files);
+  }
+
+  function hintFor() {
+    if (cam.mode === 'camera') {
+      return expectedCount() > 1
+        ? 'التقط صورتين: الأمامية ثم الخلفية. يمكنك حذف أي صورة وإعادة التقاطها.'
+        : 'التقط صورة واحدة للمستند.';
+    }
+    return expectedCount() > 1 ? 'اختر صورتين: الأمامية والخلفية للهوية.' : 'اختر صورة واحدة للسجل المدني.';
+  }
+
+  // المتصفح يسمح بالكاميرا على localhost فقط (أو https)، وليس على عنوان الشبكة
+  function cameraAllowed() {
+    return !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  }
+
+  function setCamStatus(msg, kind) {
+    camStatus.textContent = msg;
+    camStatus.style.color = kind === 'err' ? 'var(--err)' : (kind === 'ok' ? 'var(--ok)' : '');
+  }
+
+  function switchMode(mode) {
+    cam.mode = mode;
+    modeTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.mode === mode));
+    uploadPane.hidden = mode !== 'upload';
+    cameraPane.hidden = mode !== 'camera';
+    if (mode !== 'camera') stopCamera();
+    filesHint.textContent = hintFor();
+    if (mode === 'camera') {
+      renderShots();
+      setCamStatus(cam.stream ? camReadyMsg() : 'لم تبدأ الكاميرا بعد — اضغط «تشغيل الكاميرا».', cam.stream ? 'ok' : '');
+    }
+    updateBadge();
+  }
+
+  function camReadyMsg() {
+    const total = expectedCount();
+    const n = cam.shots.length;
+    if (n >= total) {
+      return 'التقطت كل الصور (' + n + '/' + total + ') — اضغط «استخراج البيانات» أو احذف صورة لإعادة الالتقاط.';
+    }
+    return 'الكاميرا جاهزة — الصورة ' + (n + 1) + ' من ' + total + ' (' + shotName(n) + ').';
+  }
+
+  function releaseStream() {
+    if (cam.stream) {
+      cam.stream.getTracks().forEach(track => track.stop());
+      cam.stream = null;
+    }
+    camVideo.srcObject = null;
+    camShot.disabled = true;
+    camStop.disabled = true;
+    camStart.textContent = 'تشغيل الكاميرا';
+  }
+
+  function stopCamera() {
+    releaseStream();
+    camStart.disabled = false;
+    camIdle.style.display = 'flex';
+    camIdleMsg.textContent = 'الكاميرا مغلقة — اضغط «تشغيل الكاميرا» للبدء.';
+  }
+
+  async function startCamera() {
+    if (!cameraAllowed()) {
+      camIdle.style.display = 'flex';
+      camIdleMsg.textContent = 'المتصفح يمنع تشغيل الكاميرا على هذا العنوان.';
+      setCamStatus('افتح الصفحة على الحاسوب نفسه عبر http://localhost:8000 — المتصفح لا يسمح بالكاميرا على عناوين الشبكة مثل 192.168.x.x', 'err');
+      return;
+    }
+    releaseStream();
+    camStart.disabled = true;
+    setCamStatus('جاري تشغيل الكاميرا... (المرة الأولى سيطلب المتصفح الإذن)', '');
+    const video = cam.deviceId
+      ? { deviceId: { exact: cam.deviceId }, width: { ideal: 2560 }, height: { ideal: 1440 } }
+      : { width: { ideal: 2560 }, height: { ideal: 1440 } };
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: video });
+      cam.stream = stream;
+      camVideo.srcObject = stream;
+      try { camVideo.play(); } catch (e) { /* some browsers need a user gesture */ }
+      try {
+        await stream.getVideoTracks()[0].applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+      } catch (e) { /* camera without continuous focus - fine */ }
+      camIdle.style.display = 'none';
+      camShot.disabled = false;
+      camStop.disabled = false;
+      camStart.disabled = false;
+      camStart.textContent = 'إعادة تشغيل الكاميرا';
+      await listDevices();
+      setCamStatus(camReadyMsg(), 'ok');
+    } catch (e) {
+      camStart.disabled = false;
+      const name = (e && e.name) ? e.name : '';
+      let msg = 'تعذّر تشغيل الكاميرا.';
+      if (name === 'NotAllowedError') {
+        msg = 'تم رفض إذن الكاميرا. اضغط أيقونة القفل في شريط عنوان المتصفح ← أذونات ← الكاميرا ← سمح، ثم أعد المحاولة.';
+      } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        msg = 'لم يتم العثور على كاميرا. تأكد من توصيل كاميرا USB بالحاسوب ثم أعد المحاولة.';
+      } else if (name === 'NotReadableError') {
+        msg = 'الكاميرا مستخدمة من برنامج آخر. أغلق أي برنامج يستخدمها ثم أعد المحاولة.';
+      } else if (name === 'SecurityError') {
+        msg = 'المتصفح يمنع الكاميرا على هذا العنوان — افتح الصفحة عبر http://localhost:8000';
+      }
+      camIdle.style.display = 'flex';
+      camIdleMsg.textContent = msg;
+      setCamStatus(msg, 'err');
+    }
+  }
+
+  async function listDevices() {
+    if (!cameraAllowed()) return;
+    let all = [];
+    try {
+      all = await navigator.mediaDevices.enumerateDevices();
+    } catch (e) {
+      camDevices.hidden = true;
+      return;
+    }
+    const cams = all.filter(d => d.kind === 'videoinput');
+    if (cams.length < 2) {
+      camDevices.hidden = true;
+      return;
+    }
+    const current = cam.stream ? cam.stream.getVideoTracks()[0].getSettings().deviceId : '';
+    camDevices.hidden = false;
+    camDevices.innerHTML = '';
+    cams.forEach((d, i) => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || ('كاميرا ' + (i + 1));
+      if (d.deviceId === current) opt.selected = true;
+      camDevices.appendChild(opt);
+    });
+    cam.deviceId = current;
+  }
+
+  function captureShot() {
+    const w = camVideo.videoWidth;
+    const h = camVideo.videoHeight;
+    if (!w || !h) {
+      setCamStatus('لم تجهز صورة الكاميرا بعد — انتظر ثانية ثم أعد المحاولة.', 'err');
+      return;
+    }
+    if (cam.shots.length >= expectedCount()) {
+      setCamStatus('اكتمل العدد المطلوب (' + expectedCount() + ') — احذف صورة من الأسفل لتعيد الالتقاط.', 'err');
+      return;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(camVideo, 0, 0, w, h);
+    canvas.toBlob(blob => {
+      if (!blob) {
+        setCamStatus('تعذّر التقاط الصورة — أعد المحاولة.', 'err');
+        return;
+      }
+      const file = new File([blob], 'camera-' + (cam.shots.length + 1) + '.jpg', { type: 'image/jpeg' });
+      cam.shots.push(file);
+      renderShots();
+      updateBadge();
+      setCamStatus(camReadyMsg(), 'ok');
+    }, 'image/jpeg', 0.92);
+  }
+
+  function renderShots() {
+    shotsBox.innerHTML = '';
+    if (cam.shots.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'shot-empty';
+      empty.textContent = 'لا توجد صور ملتقطة بعد.';
+      shotsBox.appendChild(empty);
+      return;
+    }
+    cam.shots.forEach((file, i) => {
+      const item = document.createElement('div');
+      item.className = 'shot-item';
+      const img = document.createElement('img');
+      const url = URL.createObjectURL(file);
+      img.src = url;
+      img.alt = shotName(i);
+      img.addEventListener('load', () => URL.revokeObjectURL(url));
+      const cap = document.createElement('div');
+      cap.className = 'cap';
+      cap.textContent = (i + 1) + '. ' + shotName(i);
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'del';
+      del.title = 'حذف الصورة';
+      del.setAttribute('aria-label', 'حذف الصورة');
+      del.textContent = '×';
+      del.addEventListener('click', () => {
+        cam.shots.splice(i, 1);
+        renderShots();
+        updateBadge();
+        if (cam.stream) setCamStatus(camReadyMsg(), 'ok');
+      });
+      item.appendChild(img);
+      item.appendChild(cap);
+      item.appendChild(del);
+      shotsBox.appendChild(item);
+    });
+  }
+
+  modeTabs.forEach(tab => tab.addEventListener('click', () => switchMode(tab.dataset.mode)));
+  camStart.addEventListener('click', startCamera);
+  camStop.addEventListener('click', stopCamera);
+  camShot.addEventListener('click', captureShot);
+  camDevices.addEventListener('change', () => {
+    cam.deviceId = camDevices.value;
+    startCamera();
+  });
+  window.addEventListener('beforeunload', releaseStream);
+
+  function updateBadge() {
+    const n = pendingFiles().length;
+    if (n === 0) {
+      filesBadge.style.display = 'none';
+      filesBadge.textContent = '';
+      return;
+    }
+    filesBadge.style.display = 'block';
+    filesBadge.textContent = filesBadge.textContent = (cam.mode === 'camera' ? '— ملتقطة بالكاميرا' : '— من الجهاز') + 'تم اختيار ' + n + ' ' + (n > 2 ? 'ملفات' : (n === 1 ? 'ملف' : 'ملفين'));
+  }
+
+  function showAlert(type, msg) {
+    alertBox.className = 'alert ' + type;
+    alertBox.textContent = msg;
+    alertBox.style.display = 'block';
+  }
+
+  function hideAlert() {
+    alertBox.style.display = 'none';
+  }
+
+  function setLoading(on) {
+    spinner.style.display = on ? 'block' : 'none';
+    loadingText.style.display = on ? 'block' : 'none';
+    runBtn.disabled = on;
+    runBtn.textContent = on ? 'جاري المعالجة...' : 'استخراج البيانات';
+    docType.disabled = on;
+    engine.disabled = on;
+    filesInput.disabled = on;
+    camShot.disabled = on || !cam.stream;
+  }
+
+  const STATUS_MARKS = {
+    ok: { mark: '\u2713', title: '\u0645\u0633\u062a\u062e\u0631\u062c \u0628\u0634\u06a9\u0644 \u2014 \u0644\u0627 \u064a\u062d\u062a\u0627\u062c \u0639\u0644\u064a\u0647' },
+    low: { mark: '\u26a0', title: '\u0627\u0644\u0642\u0631\u0627\u0621\u0629 \u063a\u064a\u0631 \u0645\u0624\u0643\u062f\u0629 \u2014 \u0631\u0627\u062c\u0639\u0647\u0627 \u0642\u0628\u0644 \u0627\u0644\u0646\u0642\u0644' },
+    missing: { mark: '\u2717', title: '\u0627\u0644\u062d\u0642\u0644 \u0645\u0641\u0642\u0648\u062f \u2014 \u0623\u062f\u062e\u0644\u0647 \u064a\u062f\u0648\u064a\u0627\u064b' }
+  };
+
+  function statusOf(key) {
+    const map = (lastResult && lastResult.extraction_status && lastResult.extraction_status.field_status) || {};
+    return map[key] || 'missing';
+  }
+
+  function renderResults(result) {
+    const fields = result.fields || {};
+    const status = result.extraction_status || {};
+    lastResult = result;
+    transferCard.style.display = 'block';
+    hideToast();
+    resultsTitle.textContent = 'نتائج استخراج البيانات — ' + (DOC_LABELS[result.document_type] || result.document_type);
+    resultsTitle.style.display = 'block';
+
+    let rows = '';
+    Object.entries(FIELD_LABELS).forEach(([key, label]) => {
+      const val = fields[key];
+      const st = statusOf(key);
+      const info = STATUS_MARKS[st];
+      rows += '<tr><th><span class="fstatus ' + st + '" title="' + info.title + '">' + info.mark + '</span>' + label + '</th>'
+        + '<td><input type="text" class="' + st + '" data-key="' + key + '" value="'
+        + escapeHtml(val === null || val === undefined ? '' : String(val)) + '" placeholder="\u2014"></td></tr>';
+    });
+
+    resultsTable.innerHTML = '<table><tbody>' + rows + '</tbody></table>';
+    resultsTable.style.display = 'block';
+
+    resultsTable.querySelectorAll('input[data-key]').forEach(inp => {
+      inp.addEventListener('input', () => updateFieldMark(inp));
+    });
+
+    const counts = { ok: 0, low: 0, missing: 0 };
+    Object.keys(FIELD_LABELS).forEach(k => { counts[statusOf(k)]++; });
+    statusSummary.innerHTML =
+      '<span><i class="dot ok"></i>' + counts.ok + ' \u0645\u0633\u062a\u062e\u0631\u062c</span>'
+      + '<span><i class="dot low"></i>' + counts.low + ' \u064a\u062d\u062a\u0627\u062c \u0645\u0631\u0627\u062c\u0639\u0629</span>'
+      + '<span><i class="dot missing"></i>' + counts.missing + ' \u0645\u0641\u0642\u0648\u062f</span>';
+    statusSummary.style.display = 'flex';
+    statusLegend.style.display = 'block';
+
+    if (status.success) {
+      showAlert('ok', 'تم استخراج جميع البيانات المرغوبة بنجاح. \u2691');
+    } else {
+      const missing = (status.missing_required_fields || []).map(k => FIELD_LABELS[k] || k).join('، ');
+      const low = (status.low_confidence_fields || []).map(k => FIELD_LABELS[k] || k).join('، ');
+      let msg = 'لم يتم العثور على بعض الحقول: ' + missing + '.';
+      if (low) msg += ' الحقول التالية بحاجة إلى مراجعة (وضوح منخفض): ' + low + '.';
+      showAlert('warn', msg);
+    }
+  }
+
+  // the operator edits the value -> the mark follows what is in the box now
+  function updateFieldMark(input) {
+    const st = input.value.trim() === '' ? 'missing' : 'ok';
+    input.className = st;
+    const badge = input.closest('tr').querySelector('.fstatus');
+    if (badge) {
+      badge.className = 'fstatus ' + st;
+      badge.textContent = STATUS_MARKS[st].mark;
+      badge.title = STATUS_MARKS[st].title;
+    }
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // يجمع القيم الحالية من الحقول القابلة للتعديل (بعد تعديل المستخدم)
+  function collectFields() {
+    const out = {};
+    Object.keys(FIELD_LABELS).forEach(key => {
+      const input = resultsTable.querySelector('input[data-key="' + key + '"]');
+      out[key] = input ? input.value.trim() : ((lastResult && lastResult.fields ? lastResult.fields[key] : undefined) || '');
+    });
+    return out;
+  }
+
+  function showToast(type, msg) {
+    transferToast.className = type;
+    transferToast.style.display = 'block';
+    transferToast.textContent = msg;
+  }
+
+  function hideToast() {
+    transferToast.style.display = 'none';
+  }
+
+  // نسخ الحقول كنص (بديل يدوي إذا ما تركب الإضافة)
+  function copyAsText() {
+    if (!lastResult) return;
+    lastResult.fields = collectFields();
+    const lines = Object.entries(lastResult.fields || {})
+      .filter(([, v]) => v !== null && v !== undefined && v !== '')
+      .map(([k, v]) => (FIELD_LABELS[k] || k) + ': ' + v);
+    const text = lines.join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('ok', 'تم نسخ البيانات إلى الحافظة. الصقها في النموذج (Ctrl+V).');
+    }).catch(() => {
+      showToast('err', 'تعذر النسخ. جرّب التحديد اليدوي من الجدول.');
+    });
+  }
+
+  // زر النقل إلى تاب الموقع الحقيقي عبر إضافة ID Relay
+  async function transferData() {
+    if (!lastResult) return;
+    lastResult.fields = collectFields();
+    transferBtn.disabled = true;
+    showToast('warn', 'جاري الإرسال...');
+    try {
+      await fetch('/relay/last', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lastResult)
+      });
+    } catch (e) {
+      showToast('err', 'تعذر الوصول إلى الخادم المحلي.');
+      transferBtn.disabled = false;
+      return;
+    }
+
+    let answered = false;
+    const transferLabel = transferBtn.textContent;
+    const onResponse = (e) => {
+      answered = true;
+      transferBtn.disabled = false;
+      transferBtn.textContent = transferLabel;
+      const res = e.detail || {};
+      if (res.ok) {
+        const filled = res.filled || [];
+        const missed = res.missed || [];
+        const skipped = res.skipped || [];
+        const notes = res.notes || [];
+        const visited = res.visited || [];
+        let msg = 'تم ملء ' + filled.length + ' حقل';
+        if (visited.length) msg += ' عبر الخطوات: ' + visited.join('، ') + '.';
+        else msg += ' (تم فتح تاب الموقع).';
+        if (missed.length) msg += ' لم يُملأ: ' + missed.map(relayName).join('، ') + '.';
+        if (skipped.length) msg += ' بلا قيمة: ' + skipped.map(relayName).join('، ') + '.';
+        if (notes.length) msg += ' ملاحظات: ' + notes.join(' ');
+        showToast(missed.length ? 'warn' : 'ok', msg);
+      } else {
+        showToast('err', res.errorText || res.error || 'فشل النقل.');
+      }
+    };
+    window.addEventListener('IDRELAY_RESPONSE', onResponse, { once: true });
+    window.dispatchEvent(new CustomEvent('IDRELAY_SEND', { detail: lastResult }));
+
+    // التعبئة قد تتنقل بين خطوات النموذج وتفتح قوائم منسدلة، فالمهلة أطول بكثير.
+    const TRANSFER_TIMEOUT_MS = 75000;
+    const startedAt = Date.now();
+    const ticker = setInterval(() => {
+      const s = Math.round((Date.now() - startedAt) / 1000);
+      transferBtn.textContent = 'جاري النقل... ' + s + 'ث';
+    }, 1000);
+
+    setTimeout(() => {
+      clearInterval(ticker);
+      if (!answered) {
+        window.removeEventListener('IDRELAY_RESPONSE', onResponse);
+        transferBtn.disabled = false;
+        transferBtn.textContent = transferLabel;
+        showToast('warn', 'الإضافة غير مثبتة أو لم تستجب خلال 75 ثانية — تم النسخ إلى الحافظة بديلاً. الصق البيانات يدوياً أو ثبّت إضافة ID Relay من مجلد extension.');
+        copyAsText();
+      }
+    }, TRANSFER_TIMEOUT_MS);
+  }
+
+  transferBtn.addEventListener('click', transferData);
+  copyBtn.addEventListener('click', copyAsText);
+
+  runBtn.addEventListener('click', async () => {
+    hideAlert();
+    const files = pendingFiles();
+    const multiple = docType.value === 'national_id';
+    const expected = multiple ? 2 : 1;
+
+    if (files.length !== expected) {
+      showAlert('err', multiple ? 'يلزم صورتان بالضبط (الأمامية والخلفية) — ارفعهما من الجهاز أو التقطهما بالكاميرا.' : 'يلزم صورة واحدة — ارفعها من الجهاز أو التقطها بالكاميرا.');
+      return;
+    }
+
+    const form = new FormData();
+    form.append('document_type', docType.value);
+    form.append('engine', engine.value);
+    for (const f of files) form.append('files', f);
+
+    setLoading(true);
+    try {
+      const res = await fetch('/extract', { method: 'POST', body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = data.detail || ('حدث خطأ أثناء المعالجة (كود ' + res.status + ').');
+        showAlert('err', typeof detail === 'string' ? detail : JSON.stringify(detail));
+        resultsTitle.style.display = 'none';
+        resultsTable.style.display = 'none';
+      statusSummary.style.display = 'none';
+      statusLegend.style.display = 'none';
+        transferCard.style.display = 'none';
+      } else {
+        renderResults(data);
+      }
+    } catch (e) {
+      showAlert('err', 'تعذر الوصول إلى الخادم. تأكد من أنه يعمل ثم أعد المحاولة.');
+      resultsTitle.style.display = 'none';
+      resultsTable.style.display = 'none';
+      statusSummary.style.display = 'none';
+      statusLegend.style.display = 'none';
+      transferCard.style.display = 'none';
+    } finally {
+      setLoading(false);
+    }
+  });
+</script>
+</body>
+</html>

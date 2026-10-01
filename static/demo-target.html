@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>موقع الإدخال — تجربة (نموذج تجريبي للاختبار فقط)</title>
+<style>
+  body { font-family: "Segoe UI", Tahoma, Arial, sans-serif; max-width: 640px; margin: 24px auto; padding: 0 16px; }
+  h1 { font-size: 20px; color: #0f172a; }
+  .note { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 18px; }
+  form { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 22px; }
+  .row { margin-bottom: 14px; }
+  label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+  input { width: 100%; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+  input[type="checkbox"] { width: auto; }
+  .log { margin-top: 18px; background: #0f172a; color: #cbd5e1; border-radius: 10px; padding: 12px 14px; font-size: 12px; min-height: 60px; font-family: Consolas, monospace; white-space: pre-wrap; }
+  .log b { color: #34d399; }
+</style>
+</head>
+<body>
+  <h1>صفحة إدخال تجريبية (تحاكي موقع العميل)</h1>
+  <div class="note">هذه صفحة تجريبية فقط لاختبار ناقل البيانات. افتحها في تاب منفصل، وأجرِ استخراجاً من صفحة التطبيق ثم اضغط «نقل البيانات».</div>
+
+  <form id="entryForm">
+    <div class="row">
+      <label for="f_name">الاسم الأول</label>
+      <input id="f_name" name="firstName" type="text" placeholder="اسم المستفيد">
+    </div>
+    <div class="row">
+      <label for="f_father">اسم الأب</label>
+      <input id="f_father" name="fatherName" type="text">
+    </div>
+    <div class="row">
+      <label for="f_family">النسبة</label>
+      <input id="f_family" name="familyName" type="text">
+    </div>
+    <div class="row">
+      <label for="f_mother">اسم الأم</label>
+      <input id="f_mother" name="motherName" type="text">
+    </div>
+    <div class="row">
+      <label for="f_birth">تاريخ الولادة</label>
+      <input id="f_birth" name="birthDate" type="text">
+    </div>
+    <div class="row">
+      <label for="f_reg">رقم القيد</label>
+      <input id="f_reg" name="regNumber" type="text">
+    </div>
+    <div class="row">
+      <label for="f_nat">الرقم الوطني</label>
+      <input id="f_nat" name="nationalNumber" type="text">
+    </div>
+    <div class="row">
+      <label for="f_note">@حقل آخر لا يجب أن يمتلئ تلقائياً (مثال: رقم المعاملة)</label>
+      <input id="f_note" name="mediaNote" type="text">
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="f_agree"> موافقة — يجب تجاهلها</label>
+    </div>
+    <button type="button" id="fakeSubmit" style="background:#2563eb;color:#fff;border:0;padding:10px 18px;border-radius:8px;font-family:inherit;font-weight:700;cursor:pointer;">حفظ مسودة (لا يُضغط من الناقل)</button>
+  </form>
+
+  <div class="log" id="log">سجل الأحداث (input/change) ...</div>
+
+  <script>
+    // محاكاة سلوك SPA: الحقول المضبوطة برمجياً تعرّف فقط من أحداث input/change
+    document.querySelectorAll('input').forEach(function (inp) {
+      ['input', 'change'].forEach(function (evt) {
+        inp.addEventListener(evt, function () {
+          const box = document.getElementById('log');
+          const t = new Date().toLocaleTimeString();
+          box.innerHTML = box.innerHTML.replace('سجل الأحداث (input/change) ...', '') +
+            '\n[' + t + '] <b>' + evt + '</b> ← ' + (inp.name || inp.id) + ' = "' + inp.value + '"';
+        });
+      });
+    });
+    document.getElementById('fakeSubmit').addEventListener('click', function () {
+      document.getElementById('log').innerHTML += '\n⚠ تم الضغط على حفظ (بشكل يدوي فقط).';
+    });
+  </script>
+</body>
+</html>

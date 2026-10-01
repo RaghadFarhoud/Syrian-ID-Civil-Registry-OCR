@@ -21,6 +21,47 @@ def _looks_like_valid_date(value: str) -> bool:
     return bool(_DATE_PATTERN.match(value.strip()))
 
 
+# التاريخ يطلع للعميل بصيغة يوم/شهر/سنة
+_DATE_DISPLAY_PATTERN = re.compile(r"^(\d{1,4})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{1,4})$")
+_EASTERN_DIGIT_CHARS = set("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹")
+
+
+def _format_date_for_display(value: str) -> str:
+    """dd/mm/yyyy, orders 1990-05-12 and 12-05-1990 alike, and if the original
+    digits were Arabic it returns Arabic digits. Anything unparsable is returned
+    as-is so the reviewer can see what was actually read."""
+    text = value.strip()
+    match = _DATE_DISPLAY_PATTERN.match(text)
+    if not match:
+        return text
+
+    first, second, third = match.groups()
+    if len(first) == 4 and len(third) <= 2:
+        year, month, day = first, second, third
+    elif len(third) == 4 and len(first) <= 2:
+        day, month, year = first, second, third
+    else:
+        return text
+
+    year, month, day = int(year), int(month), int(day)
+    if not (1000 <= year <= 9999 and 1 <= month <= 12 and 1 <= day <= 31):
+        return text
+
+    formatted = f"{day:02d}/{month:02d}/{year:04d}"
+    if any(ch in _EASTERN_DIGIT_CHARS for ch in text):
+        formatted = formatted.translate(str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩"))
+    return formatted
+
+
+# الأرقام العربية والفارسية تتحول لأرقام إنجليزية قبل الإرسال
+_ASCII_DIGITS_TABLE = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "0123456789" * 2)
+
+
+def _format_number_for_display(value: str) -> str:
+    """الرقم الوطني يطلع بأرقام إنجليزية 0-9 كما يطلبها نموذج الموقع."""
+    return value.translate(_ASCII_DIGITS_TABLE)
+
+
 def merge_by_confidence(*extracted_sides: dict) -> dict:
     merged: dict[str, dict] = {}
     for side in extracted_sides:
@@ -43,22 +84,33 @@ def build_output(
 
     fields = {}
     low_confidence_fields = []
+    field_status = {}
 
     for key in fields_to_check:
         entry = merged_fields.get(key)
         if entry is None:
             fields[key] = None
+            field_status[key] = "missing"
             continue
-        fields[key] = entry["value"]
+
+        value = entry["value"]
+        if key == "birth_date":
+            value = _format_date_for_display(value)
+        elif key == "national_number":
+            value = _format_number_for_display(value)
+        fields[key] = value
 
         needs_review = entry["confidence"] < MIN_OCR_CONFIDENCE
-        if key == "birth_date" and not _looks_like_valid_date(entry["value"]):
+        if key == "birth_date" and not _looks_like_valid_date(value):
             needs_review = True
-        if key == "national_number" and not _looks_like_valid_national_number(entry["value"]):
+        if key == "national_number" and not _looks_like_valid_national_number(value):
             needs_review = True
 
         if needs_review:
             low_confidence_fields.append(key)
+            field_status[key] = "low"
+        else:
+            field_status[key] = "ok"
 
     missing_required = [f for f in required if fields[f] is None]
 
@@ -69,5 +121,6 @@ def build_output(
             "success": len(missing_required) == 0,
             "missing_required_fields": missing_required,
             "low_confidence_fields": low_confidence_fields,
+            "field_status": field_status,
         },
     }

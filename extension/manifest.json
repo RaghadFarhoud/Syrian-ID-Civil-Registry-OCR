@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "ID Relay — ناقل بيانات الاستخراج",
+  "version": "1.0.0",
+  "description": "ينقل بيانات الاستخراج من صفحة الاستخراج المحلية إلى موقع الإدخال في تاب آخر. يملأ النموذج فقط ولا يضغط أي زر.",
+  "permissions": ["tabs", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["content-our.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_popup": "popup.html", "default_title": "ID Relay — ناقل البيانات", "default_icon": { "16": "icon16.png", "32": "icon32.png", "48": "icon48.png", "128": "icon128.png" } },
+  "icons": { "16": "icon16.png", "32": "icon32.png", "48": "icon48.png", "128": "icon128.png" }
+}
