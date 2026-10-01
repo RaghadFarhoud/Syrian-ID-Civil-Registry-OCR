@@ -5,9 +5,3 @@ __pycache__/
 result.json
 *.jpg
 !sample_images/*.jpg
-extension/.env
-server.log
-server_err.log
-wheels/
-tesseract/
-installers/

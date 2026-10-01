@@ -4,28 +4,11 @@ import numpy as np
 import pytesseract
 from PIL import Image
 import os as _os
-from pathlib import Path
+import platform as _platform
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-# Tesseract is used for rotation detection and for the digit re-crops, so it must
-# exist locally. It is never downloaded: the client gets a portable copy inside the
-# project (tesseract/), and this lookup finds it in any order. First match wins:
-#   1) TESSERACT_CMD            - explicit override from the environment
-#   2) tesseract/               - portable copy shipped with the offline bundle
-#   3) the standard Windows install
-#   4) whatever is already on PATH (pytesseract default)
-_TESSERACT_CANDIDATES = [
-    _os.environ.get("TESSERACT_CMD"),
-    str(_PROJECT_ROOT / "tesseract" / "tesseract.exe"),
-    str(_PROJECT_ROOT / "tesseract" / "bin" / "tesseract.exe"),
-    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-]
-for _candidate in _TESSERACT_CANDIDATES:
-    if _candidate and _os.path.isfile(_candidate):
-        pytesseract.pytesseract.tesseract_cmd = _candidate
-        break
+_DEFAULT_WINDOWS_TESSERACT = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+if _platform.system() == "Windows" and _os.path.exists(_DEFAULT_WINDOWS_TESSERACT):
+    pytesseract.pytesseract.tesseract_cmd = _DEFAULT_WINDOWS_TESSERACT
 
 # أول شي منحول الصورة لمصفوفةcv
 def load_image(path: str) -> np.ndarray:
@@ -37,8 +20,8 @@ def correct_rotation(image: np.ndarray) -> tuple[np.ndarray, int]:
     try:
         osd = pytesseract.image_to_osd(image, output_type=pytesseract.Output.DICT)
         rotate_angle = osd.get("rotate", 0)
-    except Exception:
-# إذا فشل (أو Tesseract مو موجود) خلص ما مندورا
+    except pytesseract.TesseractError:
+# إذا فشل خلص ما مندورا
         rotate_angle = 0
 
     if rotate_angle == 0:

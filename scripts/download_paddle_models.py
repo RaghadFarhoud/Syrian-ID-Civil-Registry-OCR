@@ -1,11 +1,6 @@
 
 import shutil
-import sys
 from pathlib import Path
-
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 LOCAL_MODELS_DIR = PROJECT_ROOT / "models"

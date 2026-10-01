@@ -1,5 +1,4 @@
 
-from pathlib import Path
 from typing import Literal
 
 from core.ocr_engine import OCREngine
@@ -8,44 +7,21 @@ from pipelines.national_id_pipeline import NationalIdPipeline
 
 DocumentType = Literal["national_id", "civil_registry"]
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-
 _PIPELINES = {
     "national_id": NationalIdPipeline,
     "civil_registry": CivilRegistryPipeline,
 }
 
-MODEL_NAMES = {
-    "det": "PP-OCRv5_mobile_det",
-    "rec": "arabic_PP-OCRv5_mobile_rec",
-    "ori": "PP-LCNet_x1_0_textline_ori",
-}
 
-
-def _resolve_model_dir(models_dir: str | Path, key: str) -> str:
-    """مسار الموديل مطلوب. وإذا ناقص ما في روح للإنترنت - بيطلع خطأ واضح."""
-    path = Path(models_dir)
-    if not path.is_absolute():
-        path = PROJECT_ROOT / path
-    target = path / MODEL_NAMES[key]
-    if not target.is_dir():
-        raise FileNotFoundError(
-            f"OCR model folder is missing: {target}\n"
-            "The program runs fully offline and never downloads models. "
-            "Keep the 'models' folder (and its 3 sub-folders) next to the project."
-        )
-    return str(target)
-
-
-def build_paddle_engine(models_dir: str | Path = "models") -> OCREngine:
+def build_paddle_engine(models_dir: str = "models") -> OCREngine:
     from core.ocr_engine import PaddleOCREngine
 
     return PaddleOCREngine(
         lang="ar",
-        text_detection_model_name=MODEL_NAMES["det"],
-        text_detection_model_dir=_resolve_model_dir(models_dir, "det"),
-        text_recognition_model_dir=_resolve_model_dir(models_dir, "rec"),
-        textline_orientation_model_dir=_resolve_model_dir(models_dir, "ori"),
+        text_detection_model_name="PP-OCRv5_mobile_det",
+        text_detection_model_dir=f"{models_dir}/PP-OCRv5_mobile_det",
+        text_recognition_model_dir=f"{models_dir}/arabic_PP-OCRv5_mobile_rec",
+        textline_orientation_model_dir=f"{models_dir}/PP-LCNet_x1_0_textline_ori",
         use_textline_orientation=False,
     )
 

@@ -4,7 +4,6 @@ from typing import Protocol
 
 import numpy as np
 import pytesseract
-import sys
 
 
 @dataclass
@@ -74,74 +73,25 @@ class PaddleOCREngine:
         use_doc_orientation_classify: bool = False,
         use_doc_unwarping: bool = False,
           use_textline_orientation: bool = False,
-        device: str | None = None,
     ):
   
         import os
         os.environ.setdefault("PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT", "False")
-        # وضع بلا إنترنت: لا نفحص Sources ولا ننزّل أي موديل. الموديلات كلها موجودة
-        # بجوار المشروع (models/) فأي طلب شبكة هنا يعني توقف لا لزوم له.
-        os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
-        os.environ.setdefault("HF_HUB_OFFLINE", "1")
-        os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
         from paddleocr import PaddleOCR
 
-        # الجهاز الافتراضي: GPU إذا كان متاحاً، وإلا CPU
-        requested_device = device or self._detect_device()
-        try:
-            self._ocr = PaddleOCR(
-                lang=lang,
-                text_detection_model_name=text_detection_model_name,
-                text_detection_model_dir=text_detection_model_dir,
-                text_recognition_model_name=text_recognition_model_name,
-                text_recognition_model_dir=text_recognition_model_dir,
-                textline_orientation_model_name=textline_orientation_model_name,
-                textline_orientation_model_dir=textline_orientation_model_dir,
-                use_doc_orientation_classify=use_doc_orientation_classify,
-                use_doc_unwarping=use_doc_unwarping,
-                use_textline_orientation=use_textline_orientation,
-                device=requested_device,
-            )
-            self._device = requested_device
-            print("[PaddleOCR] using device: %s" % requested_device, file=sys.stderr)
-        except Exception as exc:
-            # الرقم يفضّل GPU لكن إذا فشل التهيئة ننزل إلى CPU كخطة بديلة
-            if requested_device != "cpu":
-                print(
-                    "[PaddleOCR] GPU init failed (%s); falling back to CPU." % exc,
-                    file=sys.stderr,
-                )
-                self._ocr = PaddleOCR(
-                    lang=lang,
-                    text_detection_model_name=text_detection_model_name,
-                    text_detection_model_dir=text_detection_model_dir,
-                    text_recognition_model_name=text_recognition_model_name,
-                    text_recognition_model_dir=text_recognition_model_dir,
-                    textline_orientation_model_name=textline_orientation_model_name,
-                    textline_orientation_model_dir=textline_orientation_model_dir,
-                    use_doc_orientation_classify=use_doc_orientation_classify,
-                    use_doc_unwarping=use_doc_unwarping,
-                    use_textline_orientation=use_textline_orientation,
-                    device="cpu",
-                )
-                self._device = "cpu"
-            else:
-                raise
-
-    @staticmethod
-    def _detect_device() -> str:
-        try:
-            import paddle
-
-            if not paddle.device.is_compiled_with_cuda():
-                return "cpu"
-            count = paddle.device.cuda.device_count()
-            if count and count > 0:
-                return "gpu:0"
-            return "cpu"
-        except Exception:
-            return "cpu"
+        self._ocr = PaddleOCR(
+            lang=lang,
+            text_detection_model_name=text_detection_model_name,
+            text_detection_model_dir=text_detection_model_dir,
+            text_recognition_model_name=text_recognition_model_name,
+            text_recognition_model_dir=text_recognition_model_dir,
+            textline_orientation_model_name=textline_orientation_model_name,
+            textline_orientation_model_dir=textline_orientation_model_dir,
+            use_doc_orientation_classify=use_doc_orientation_classify,
+            use_doc_unwarping=use_doc_unwarping,
+            use_textline_orientation=use_textline_orientation,
+        )
 
     def read_regions(self, prep: dict) -> list[TextRegion]:
         image = prep["color"]  
