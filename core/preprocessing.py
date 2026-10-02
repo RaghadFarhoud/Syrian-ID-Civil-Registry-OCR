@@ -6,6 +6,8 @@ from PIL import Image
 import os as _os
 import platform as _platform
 
+from core.card_detection import normalize_card
+
 _DEFAULT_WINDOWS_TESSERACT = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 if _platform.system() == "Windows" and _os.path.exists(_DEFAULT_WINDOWS_TESSERACT):
     pytesseract.pytesseract.tesseract_cmd = _DEFAULT_WINDOWS_TESSERACT
@@ -52,14 +54,23 @@ def enhance_for_ocr(image: np.ndarray) -> np.ndarray:
     enhanced = clahe.apply(denoised)
     return enhanced
 
+def resize_to_width(img, width):
+    h, w = img.shape[:2]
+    if h > w:
+        img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+        h, w = w, h
+    if width is None or width == w:
+        return img
+    interp = cv2.INTER_AREA if width < w else cv2.INTER_CUBIC
+    return cv2.resize(img, (width, int(h * width / w)), interpolation=interp)
 
-def preprocess(path: str) -> dict:
-    # بطبق المعالجة وبرجع صوتين وحدة ملونة ووحدة بتدرج رمادي 
+def preprocess(path: str, width: int | None = None) -> dict:    # بطبق المعالجة وبرجع صوتين وحدة ملونة ووحدة بتدرج رمادي 
     # الملونة للبادل والرمادي ل tesseract 
     from core.card_detection import detect_and_crop_card
 
     image = load_image(path)
     image = detect_and_crop_card(image)
+    image = resize_to_width(image, width)
     rotated, angle = correct_rotation(image)
     enhanced = enhance_for_ocr(rotated)
     return {

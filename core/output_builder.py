@@ -1,7 +1,7 @@
 import re
 
 from core.config import ALL_FIELDS, MIN_OCR_CONFIDENCE, OPTIONAL_FIELDS, REQUIRED_FIELDS
-
+from collections import Counter
 _DATE_PATTERN = re.compile(
     r"^\D*[\d٠-٩]{1,4}\D+[\d٠-٩]{1,4}\D+[\d٠-٩]{2,4}\D*$"
 )
@@ -28,7 +28,24 @@ def merge_by_confidence(*extracted_sides: dict) -> dict:
             if field_key not in merged or data["confidence"] > merged[field_key]["confidence"]:
                 merged[field_key] = data
     return merged
+def _is_valid(key: str, value: str) -> bool:
+    if key == "national_number":
+        return _looks_like_valid_national_number(value)
+    if key == "birth_date":
+        return _looks_like_valid_date(value)
+    return True
 
+
+def merge_runs(*runs: dict) -> dict:
+    merged: dict[str, dict] = {}
+    for key in {k for run in runs for k in run}:
+        cands = [run[key] for run in runs if key in run]
+        votes = Counter(c["value"] for c in cands)
+        best = dict(max(cands, key=lambda c: (_is_valid(key, c["value"]), votes[c["value"]], c["confidence"])))
+        if votes[best["value"]] >= 2:
+            best["confidence"] = max(c["confidence"] for c in cands if c["value"] == best["value"])
+        merged[key] = best
+    return merged
 
 def build_output(
     merged_fields: dict,

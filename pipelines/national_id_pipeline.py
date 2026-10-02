@@ -1,13 +1,14 @@
 from core.field_parser import parse_regions_to_fields, reocr_missing_trailing_numbers
 from core.id_date import finalize_birth_date, finalize_national_number
 from core.ocr_engine import OCREngine, TesseractOCREngine
-from core.output_builder import build_output, merge_by_confidence
+from core.output_builder import build_output, merge_by_confidence, merge_runs
 from core.preprocessing import preprocess
 
 
 class NationalIdPipeline:
     DOCUMENT_TYPE = "national_id"
     EXPECTED_IMAGE_COUNT = 2  # back + front
+    WIDTHS = (None, 800)  # None = الحجم الأصلي بعد القص
 
     def __init__(self, ocr_engine: OCREngine | None = None):
         self.ocr_engine = ocr_engine or TesseractOCREngine()
@@ -23,14 +24,21 @@ class NationalIdPipeline:
         rotations = []
 
         for path in image_paths:
-            prep = preprocess(path)
-            rotations.append(prep["rotation_applied"])
-            regions = self.ocr_engine.read_regions(prep)
-            extracted = parse_regions_to_fields(regions)
-            extracted = reocr_missing_trailing_numbers(extracted, prep, self.ocr_engine)
-            extracted = finalize_birth_date(extracted, regions, prep, self.ocr_engine)
-            extracted = finalize_national_number(extracted)
-            side_extractions.append(extracted)
+            runs = []
+            rotation = 0
+            for width in self.WIDTHS:
+                prep = preprocess(path, width)
+                if not runs:
+                    rotation = prep["rotation_applied"]
+                regions = self.ocr_engine.read_regions(prep)
+                extracted = parse_regions_to_fields(regions, id_mode=True)
+                extracted = reocr_missing_trailing_numbers(extracted, prep, self.ocr_engine)
+                extracted = finalize_birth_date(extracted, regions, prep, self.ocr_engine)
+                extracted = finalize_national_number(extracted)
+                runs.append(extracted)
+
+            rotations.append(rotation)
+            side_extractions.append(merge_runs(*runs))
 
         merged = merge_by_confidence(*side_extractions)
 

@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 
 # منقص على اكبر مستطيل موجودواذا ما التقا تباين واضح منخلي الصورة كاملة
-def detect_and_crop_card(image: np.ndarray, min_area_ratio: float = 0.15) -> np.ndarray:
+def detect_and_crop_card(image: np.ndarray, min_area_ratio: float = 0.02) -> np.ndarray:
   
     h, w = image.shape[:2]
     total_area = h * w
@@ -33,8 +33,20 @@ def detect_and_crop_card(image: np.ndarray, min_area_ratio: float = 0.15) -> np.
 
     pts = approx.reshape(4, 2).astype("float32")
     ordered = _order_points(pts)
-    return _warp_perspective(image, ordered)
 
+    (tl, tr, br, bl) = ordered
+    w_card = max(np.linalg.norm(tr - tl), np.linalg.norm(br - bl))
+    h_card = max(np.linalg.norm(bl - tl), np.linalg.norm(br - tr))
+    ratio = max(w_card, h_card) / max(min(w_card, h_card), 1)
+    if not (1.2 <= ratio <= 2.0):
+        return image
+    return _warp_perspective(image, ordered)
+def normalize_card(img, width=1600):
+    h, w = img.shape[:2]
+    if h > w:
+        img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+        h, w = w, h
+    return cv2.resize(img, (width, int(h * width / w)), interpolation=cv2.INTER_CUBIC)
 # هون منرتب 4 نقاط فوق - يمين، فوق - يسار، تحت - يمين، تحت - يسار
 def _order_points(pts: np.ndarray) -> np.ndarray:
     rect = np.zeros((4, 2), dtype="float32")

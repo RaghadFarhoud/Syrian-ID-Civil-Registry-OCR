@@ -3,7 +3,7 @@ import re
 from datetime import date
 
 import cv2
-
+from collections import Counter
 from core.config import MIN_OCR_CONFIDENCE
 
 _MIN_YEAR = 1900
@@ -95,12 +95,15 @@ def normalize_id_date(text: str) -> tuple[str | None, bool]:
     return None, False
 
 
-def _agrees_with_original(candidate: str, original_value: str) -> bool:
-#    منعمل قرائتين وحدة للصورة الاصلية وقراءة تانية للاستخراج ولازم يتطابقو تماماً
-    day, month, year = candidate.split("-")
-    unpadded = f"{int(day)}{int(month)}{year}"
-    return sorted(unpadded) == sorted(_digits_only(original_value))
+from collections import Counter
 
+def _agrees_with_original(candidate: str, original_value: str) -> bool:
+    day, month, year = candidate.split("-")
+    cand = Counter(f"{int(day)}{int(month)}{year}")
+    orig = Counter(_digits_only(original_value))
+    extra_in_original = sum((orig - cand).values())   # رقم في الأولى غير موجود في الثانية
+    missing_in_original = sum((cand - orig).values()) # رقم في الثانية ناقص من الأولى
+    return extra_in_original == 0 and missing_in_original <= 1
 
 
 _REREAD_WINDOWS = (0.30, 0.33, 0.36, 0.39, 0.42, 0.45, 0.50, 0.60, 0.75, 1.0)
@@ -138,6 +141,7 @@ def reread_date(original_value: str, regions: list, prep: dict, engine, trace: l
     left = max(0, x0 - pad_x)
 
     scale = min(6.0, max(2.0, _REREAD_TARGET_HEIGHT / h))
+    votes = Counter()
     for frac in _REREAD_WINDOWS:
         right = min(img_w, x1 + pad_x) if frac >= 1.0 else min(img_w, x0 + int(w * frac) + int(h * 0.5))
         crop = color[top:bottom, left:right]
@@ -158,6 +162,13 @@ def reread_date(original_value: str, regions: list, prep: dict, engine, trace: l
                           "verified": verified, "image": big})
         if verified:
             return result
+        if result and exact:
+            votes[result] += 1
+
+    if votes:
+        best, n = votes.most_common(1)[0]
+        if n >= 2:
+            return best
     return None
 
 
@@ -166,11 +177,15 @@ def finalize_birth_date(extracted: dict, regions: list, prep: dict, engine=None)
     if entry is None:
         return extracted
     try:
-        result, exact = normalize_id_date(entry["value"])
+        original_value = entry["value"]
+        result, exact = normalize_id_date(original_value)
         if not exact:
-            reread = reread_date(entry["value"], regions, prep, engine)
+            reread = reread_date(original_value, regions, prep, engine)
             if reread:
-                result, exact = reread, True
+                result = reread
+                day, month, year = reread.split("-")
+                unpadded = f"{int(day)}{int(month)}{year}"
+                exact = len(unpadded) == len(_digits_only(original_value))
         if result is None:
             return extracted
 

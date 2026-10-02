@@ -1,4 +1,3 @@
-
 import re
 
 from rapidfuzz import fuzz, process
@@ -31,9 +30,23 @@ def _finalize_birth_date(value_text: str) -> str:
     parsed = parse_arabic_worded_date(value_text)
     return parsed if parsed else cleaned
 
-def _best_label_match(text: str) -> tuple[str, str, float] | None:
+def _strip_leading_label_tail(value: str, label: str) -> str:
+    # remove leading words of the value that duplicate the label's last word (e.g. 'الام' from 'اسم ونسبة الام')
+    tail = _norm_ar(label.split()[-1])
+    parts = value.split(None, 1)
+    if len(parts) == 2 and fuzz.ratio(_norm_ar(parts[0]), tail) >= 80:
+        return _clean_value(parts[1])
+    return value
+
+
+def _best_label_match(text: str, allowed=None, min_letters: int = 0) -> tuple[str, str, float] | None:
+    text = re.sub(r"[أإآ]", "ا", text)
+    if min_letters and len(re.sub(r"[^\w]", "", text)) < min_letters:
+        return None
     best = None
     for field_key, labels in FIELD_LABELS.items():
+        if allowed is not None and field_key not in allowed:
+            continue
         match = process.extractOne(text, labels, scorer=fuzz.partial_ratio)
         if match is None:
             continue
@@ -47,19 +60,23 @@ def _best_label_match(text: str) -> tuple[str, str, float] | None:
     field_key, label_text, score = best
     length_ratio = len(label_text) / max(len(text), 1)
     if length_ratio < MIN_LABEL_LENGTH_RATIO:
-        return None
+        # label+value in one region: accept only if the label sits at the START of the text
+        head = text[:len(label_text) + 1]
+        if fuzz.ratio(head, label_text) < 80:
+            return None
 
     return best
 
 
 def _strip_label_fuzzy(text: str, label: str) -> str:
-    label_len = len(label)
+    text_n = _norm_ar(text)
+    label_n = _norm_ar(label)
+    label_len = len(label_n)
     best_cut = None
     best_score = -1
 
-    for cut in range(max(0, label_len - 2), min(len(text), label_len + 3) + 1):
-        prefix = text[:cut]
-        score = fuzz.ratio(prefix, label)
+    for cut in range(max(0, label_len - 2), min(len(text_n), label_len + 3) + 1):
+        score = fuzz.ratio(text_n[:cut], label_n)
         if score > best_score:
             best_score = score
             best_cut = cut
@@ -67,7 +84,10 @@ def _strip_label_fuzzy(text: str, label: str) -> str:
     if best_cut is None or best_score < LABEL_MATCH_THRESHOLD:
         return text
 
-    return text[best_cut:]
+    value = text[best_cut:]
+    # حرف من الليبل تسرّب بعد القص (مثل ه بعد النسب)
+    value = _strip_leaked_label_suffix(_clean_value(value), label, text[:best_cut])
+    return value
 
 # إذاكان في مساحة كبيرة افقياً بيقسم المنطقة لعمودين
 def split_into_columns(regions: list[TextRegion], min_gap_ratio: float = 0.15) -> list[list[TextRegion]]:  
@@ -181,43 +201,66 @@ def _needs_trailing_number_recovery(value_text: str) -> bool:
     return not stripped or stripped[-1] not in _DIGIT_CHARS
 
 # هون لعالج حالة انو ممكن حرف أخير يروح لحقل تاني أو حرف أول يضل بغير حقل
+def _norm_ar(s: str) -> str:
+    return re.sub(r"[أإآ]", "ا", s).replace("ة", "ه")
+
+
 def _strip_leaked_label_suffix(value_text: str, matched_label: str, label_region_text: str) -> str:
+    label_n = _norm_ar(matched_label)
+    region_n = _norm_ar(label_region_text)
+    value_n = _norm_ar(value_text)
     best_len, best_score = 0, -1
-    for k in range(1, len(matched_label) + 1):
-        score = fuzz.ratio(label_region_text, matched_label[:k])
+    for k in range(1, len(label_n) + 1):
+        score = fuzz.ratio(region_n, label_n[:k])
         if score > best_score:
             best_score, best_len = score, k
 
-    residual = matched_label[best_len:]
+    residual = label_n[best_len:]
     if not residual or len(residual) > 3:
         return value_text
 
-    prefix_of_value = value_text[:len(residual)]
+    prefix_of_value = value_n[:len(residual)]
     if fuzz.ratio(prefix_of_value, residual) >= LABEL_MATCH_THRESHOLD:
         return _clean_value(value_text[len(residual):])
     return value_text
 
 
-def parse_regions_to_fields(regions: list[TextRegion]) -> dict:
+_ID_ORDER = ["first_name", "family_name", "father_name", "mother_name", "birth_date", "national_number"]
+
+
+def parse_regions_to_fields(regions: list[TextRegion], id_mode: bool = False) -> dict:
     extracted: dict[str, dict] = {}
     regions = _filter_noise_regions(regions)
-    all_regions = regions  
-    columns = split_into_columns(regions)
+    if id_mode:
+        heights = sorted(r.height for r in regions)
+        median_h = heights[len(heights) // 2] if heights else 0
+        if median_h:
+            regions = [r for r in regions if r.height <= median_h * 1.8]  # ضجيج الصورة الشخصية
+    all_regions = regions
+    columns = [regions] if id_mode else split_into_columns(regions)
+    state = {"last": -1}
 
     for column in columns:
         rows = group_into_rows(column)
-        _process_rows(rows, extracted, all_regions)
+        _process_rows(rows, extracted, all_regions, id_mode, state)
 
     return extracted
 
 _TRAILING_NUMBER_RECOVERY_FIELDS = {"registry_number"}
-def _process_rows(rows: list[list[TextRegion]], extracted: dict, all_regions: list[TextRegion]) -> None:
+def _process_rows(rows, extracted, all_regions, id_mode=False, state=None) -> None:
     for row in rows:
-        row_sorted = sorted(row, key=lambda r: -r.x)  
+        row_sorted = sorted(row, key=lambda r: -r.x)
 
-        colon_result = _try_colon_split(row_sorted)
+        allowed, min_letters = None, 0
+        if id_mode:
+            allowed = {k for k in FIELD_LABELS if k not in _ID_ORDER or _ID_ORDER.index(k) > state["last"]}
+            min_letters = 3
+
+        colon_result = _try_colon_split(row_sorted, allowed, 2 if id_mode else 0)
         if colon_result:
             field_key, value_text, conf = colon_result
+            if id_mode and field_key in _ID_ORDER:
+                state["last"] = _ID_ORDER.index(field_key)
             if field_key == "birth_date":
                     value_text = _finalize_birth_date(value_text)
             if field_key in _TRAILING_NUMBER_RECOVERY_FIELDS:
@@ -232,7 +275,7 @@ def _process_rows(rows: list[list[TextRegion]], extracted: dict, all_regions: li
         label_region = None
         label_match = None
         for region in row_sorted:
-            match = _best_label_match(region.text)
+            match = _best_label_match(region.text, allowed, min_letters)
             if match and (label_match is None or match[2] > label_match[2]):
                 label_region = region
                 label_match = match
@@ -241,7 +284,12 @@ def _process_rows(rows: list[list[TextRegion]], extracted: dict, all_regions: li
             continue
 
         field_key, matched_label, _ = label_match
+        if id_mode and field_key in _ID_ORDER:
+            state["last"] = _ID_ORDER.index(field_key)
         other_regions = [r for r in row_sorted if r is not label_region]
+        if id_mode:
+            # البطاقة RTL: القيمة على يسار الليبل، وما على يمينه أجزاء من الليبل
+            other_regions = [r for r in other_regions if r.x_center < label_region.x_center]
 
         if other_regions:
             value_text = " ".join(r.text for r in other_regions)
@@ -253,6 +301,8 @@ def _process_rows(rows: list[list[TextRegion]], extracted: dict, all_regions: li
             avg_conf = label_region.confidence * 0.85
 
         value_text = _clean_value(value_text)
+        if field_key == "mother_name":
+            value_text = _strip_leading_label_tail(value_text, matched_label)
         if not value_text:
             continue
 
@@ -268,13 +318,13 @@ def _process_rows(rows: list[list[TextRegion]], extracted: dict, all_regions: li
             _attach_recovery_bbox(entry, row_sorted)
         extracted[field_key] = entry
 # بدور على : وبطابق الحقل اللي قبلا مع التسميات بالكونفيغ
-def _try_colon_split(row_regions: list[TextRegion]) -> tuple[str, str, float] | None:
+def _try_colon_split(row_regions: list[TextRegion], allowed=None, min_letters: int = 0) -> tuple[str, str, float] | None:
     for i, region in enumerate(row_regions):
         if ":" not in region.text and "：" not in region.text:
             continue
 
         label_part, _, value_part = _split_on_colon(region.text)
-        match = _best_label_match(label_part)
+        match = _best_label_match(label_part, allowed, min_letters)
         if not match:
             continue
         field_key, _, score = match
